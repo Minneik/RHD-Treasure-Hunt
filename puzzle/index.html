@@ -61,113 +61,114 @@
     <div id="message"></div>
   </div>
 
-  <script>
-    // -------- SETTINGS --------
-    const TOTAL_PIECES = 9; // number of pieces in the puzzle
-    const MAX_WINNERS = 5;
-    const PUZZLE_IMAGES = [
-  "row-1-column-1.png",
-  "row-1-column-2.png",
-  "row-1-column-3.png",
-  "row-2-column-1.png",
-  "row-2-column-2.png",
-  "row-2-column-3.png",
-  "row-3-column-1.png",
-  "row-3-column-2.png",
-  "row-3-column-3.png"
-    ];
-    const FULL_PUZZLE_IMAGE = "full.jpg";
+<script>
+  // -------- SETTINGS --------
+  const TOTAL_PIECES = 9; // number of pieces
+  const PUZZLE_IMAGES = [
+    "row-1-column-1.png",
+    "row-1-column-2.png",
+    "row-1-column-3.png",
+    "row-2-column-1.png",
+    "row-2-column-2.png",
+    "row-2-column-3.png",
+    "row-3-column-1.png",
+    "row-3-column-2.png",
+    "row-3-column-3.png"
+  ];
+  const FULL_PUZZLE_IMAGE = "puzzle/full.jpg";
+  const NOTIFY_WEBHOOK = "https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec"; // optional
 
-    // optional: webhook to notify admin (replace with your own Google Script URL)
-    const NOTIFY_WEBHOOK = "https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec";
+  let userEmail = "";
+  let userData = {};
 
-    // -------- LOGIC --------
-    let userEmail = "";
-    let userData = {};
+  const urlParams = new URLSearchParams(window.location.search);
+  const thisPiece = parseInt(urlParams.get("piece")); // which QR/piece they scanned
 
-    const startBtn = document.getElementById("startBtn");
-    const getPieceBtn = document.getElementById("getPieceBtn");
-    const emailInput = document.getElementById("emailInput");
-    const puzzleSection = document.getElementById("puzzleSection");
-    const puzzleBoard = document.getElementById("puzzleBoard");
-    const message = document.getElementById("message");
+  const startBtn = document.getElementById("startBtn");
+  const getPieceBtn = document.getElementById("getPieceBtn");
+  const emailInput = document.getElementById("emailInput");
+  const puzzleSection = document.getElementById("puzzleSection");
+  const puzzleBoard = document.getElementById("puzzleBoard");
+  const message = document.getElementById("message");
 
-    function loadUser(email) {
-      const saved = localStorage.getItem("puzzle_" + email);
-      if (saved) {
-        userData = JSON.parse(saved);
+  function loadUser(email) {
+    const saved = localStorage.getItem("puzzle_" + email);
+    if (saved) {
+      userData = JSON.parse(saved);
+    } else {
+      userData = { pieces: [], completed: false };
+    }
+    userEmail = email;
+    renderPuzzle();
+  }
+
+  function saveUser() {
+    localStorage.setItem("puzzle_" + userEmail, JSON.stringify(userData));
+  }
+
+  function renderPuzzle() {
+    puzzleBoard.innerHTML = "";
+    for (let i = 0; i < TOTAL_PIECES; i++) {
+      const div = document.createElement("div");
+      div.className = "piece";
+      if (userData.pieces.includes(i + 1)) {
+        div.style.backgroundImage = `url(${PUZZLE_IMAGES[i]})`;
       } else {
-        userData = { pieces: [], completed: false };
+        div.style.backgroundColor = "#eee";
       }
-      userEmail = email;
-      renderPuzzle();
+      puzzleBoard.appendChild(div);
     }
 
-    function saveUser() {
-      localStorage.setItem("puzzle_" + userEmail, JSON.stringify(userData));
+    if (userData.completed) {
+      puzzleBoard.innerHTML = `<img src="${FULL_PUZZLE_IMAGE}" width="320" alt="Full Puzzle"/>`;
+      getPieceBtn.style.display = "none";
+      message.innerHTML = "🎉 You completed the puzzle!";
+    }
+  }
+
+  function claimPiece() {
+    if (!thisPiece || thisPiece < 1 || thisPiece > TOTAL_PIECES) {
+      message.textContent = "Invalid QR link.";
+      return;
     }
 
-    function renderPuzzle() {
-      puzzleBoard.innerHTML = "";
-      for (let i = 0; i < TOTAL_PIECES; i++) {
-        const div = document.createElement("div");
-        div.className = "piece";
-        if (userData.pieces.includes(i)) {
-          div.style.backgroundImage = `url(${PUZZLE_IMAGES[i]})`;
-        } else {
-          div.style.backgroundColor = "#eee";
-        }
-        puzzleBoard.appendChild(div);
-      }
-
-      if (userData.completed) {
-        puzzleBoard.innerHTML = `<img src="${FULL_PUZZLE_IMAGE}" width="320" alt="Full Puzzle"/>`;
-        getPieceBtn.style.display = "none";
-        message.innerHTML = "🎉 You completed the puzzle!";
-      }
+    if (userData.pieces.includes(thisPiece)) {
+      message.textContent = "You already claimed this puzzle piece!";
+      return;
     }
 
-    function getRandomPiece() {
-      const remaining = PUZZLE_IMAGES
-        .map((_, i) => i)
-        .filter(i => !userData.pieces.includes(i));
+    userData.pieces.push(thisPiece);
+    saveUser();
+    renderPuzzle();
 
-      if (remaining.length === 0) {
-        message.textContent = "You've already completed the puzzle!";
-        return;
-      }
+    message.textContent = `You collected puzzle piece #${thisPiece}!`;
 
-      const randomIndex = remaining[Math.floor(Math.random() * remaining.length)];
-      userData.pieces.push(randomIndex);
+    if (userData.pieces.length === TOTAL_PIECES) {
+      userData.completed = true;
       saveUser();
       renderPuzzle();
-
-      if (userData.pieces.length === TOTAL_PIECES) {
-        userData.completed = true;
-        saveUser();
-        renderPuzzle();
-        notifyCompletion(userEmail);
-      }
+      notifyCompletion(userEmail);
     }
+  }
 
-    function notifyCompletion(email) {
-      message.textContent = "🎉 You completed the puzzle!";
-      fetch(NOTIFY_WEBHOOK + "?email=" + encodeURIComponent(email))
-        .catch(err => console.log("Notification failed", err));
+  function notifyCompletion(email) {
+    message.textContent = "🎉 You completed the puzzle!";
+    fetch(NOTIFY_WEBHOOK + "?email=" + encodeURIComponent(email))
+      .catch(err => console.log("Notification failed", err));
+  }
+
+  startBtn.addEventListener("click", () => {
+    const email = emailInput.value.trim().toLowerCase();
+    if (!email) {
+      alert("Please enter your email.");
+      return;
     }
+    loadUser(email);
+    document.getElementById("emailSection").style.display = "none";
+    puzzleSection.style.display = "block";
+    claimPiece();
+  });
+</script>
 
-    startBtn.addEventListener("click", () => {
-      const email = emailInput.value.trim().toLowerCase();
-      if (!email) {
-        alert("Please enter your email.");
-        return;
-      }
-      loadUser(email);
-      document.getElementById("emailSection").style.display = "none";
-      puzzleSection.style.display = "block";
-    });
-
-    getPieceBtn.addEventListener("click", getRandomPiece);
-  </script>
 </body>
 </html>
