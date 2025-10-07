@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Puzzle Challenge</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 40px;
+      background-color: #f7f9fc;
+    }
+    h1 {
+      color: #333;
+    }
+    .puzzle {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 5px;
+      margin-top: 20px;
+    }
+    .piece {
+      width: 100px;
+      height: 100px;
+      border: 1px solid #ccc;
+      background-size: cover;
+      background-position: center;
+    }
+    #message {
+      margin-top: 20px;
+      font-size: 1.2em;
+      color: green;
+    }
+    #emailInput {
+      padding: 8px;
+      width: 250px;
+    }
+    #startBtn, #getPieceBtn {
+      margin-top: 10px;
+      padding: 10px 20px;
+      font-size: 1em;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>🧩 Takeda Puzzle Challenge</h1>
+
+  <div id="emailSection">
+    <p>Enter your email to start:</p>
+    <input type="email" id="emailInput" placeholder="example@takeda.com" required />
+    <br>
+    <button id="startBtn">Start</button>
+  </div>
+
+  <div id="puzzleSection" style="display:none;">
+    <h3>Your Puzzle Progress:</h3>
+    <div class="puzzle" id="puzzleBoard"></div>
+    <button id="getPieceBtn">Get Random Puzzle Piece</button>
+    <div id="message"></div>
+  </div>
+
+  <script>
+    // -------- SETTINGS --------
+    const TOTAL_PIECES = 9; // number of pieces in the puzzle
+    const MAX_WINNERS = 5;
+    const PUZZLE_IMAGES = [
+  "row-1-column-1.png",
+  "row-1-column-2.png",
+  "row-1-column-3.png",
+  "row-2-column-1.png",
+  "row-2-column-2.png",
+  "row-2-column-3.png",
+  "row-3-column-1.png",
+  "row-3-column-2.png",
+  "row-3-column-3.png"
+    ];
+    const FULL_PUZZLE_IMAGE = "full.jpg";
+
+    // optional: webhook to notify admin (replace with your own Google Script URL)
+    const NOTIFY_WEBHOOK = "https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec";
+
+    // -------- LOGIC --------
+    let userEmail = "";
+    let userData = {};
+
+    const startBtn = document.getElementById("startBtn");
+    const getPieceBtn = document.getElementById("getPieceBtn");
+    const emailInput = document.getElementById("emailInput");
+    const puzzleSection = document.getElementById("puzzleSection");
+    const puzzleBoard = document.getElementById("puzzleBoard");
+    const message = document.getElementById("message");
+
+    function loadUser(email) {
+      const saved = localStorage.getItem("puzzle_" + email);
+      if (saved) {
+        userData = JSON.parse(saved);
+      } else {
+        userData = { pieces: [], completed: false };
+      }
+      userEmail = email;
+      renderPuzzle();
+    }
+
+    function saveUser() {
+      localStorage.setItem("puzzle_" + userEmail, JSON.stringify(userData));
+    }
+
+    function renderPuzzle() {
+      puzzleBoard.innerHTML = "";
+      for (let i = 0; i < TOTAL_PIECES; i++) {
+        const div = document.createElement("div");
+        div.className = "piece";
+        if (userData.pieces.includes(i)) {
+          div.style.backgroundImage = `url(${PUZZLE_IMAGES[i]})`;
+        } else {
+          div.style.backgroundColor = "#eee";
+        }
+        puzzleBoard.appendChild(div);
+      }
+
+      if (userData.completed) {
+        puzzleBoard.innerHTML = `<img src="${FULL_PUZZLE_IMAGE}" width="320" alt="Full Puzzle"/>`;
+        getPieceBtn.style.display = "none";
+        message.innerHTML = "🎉 You completed the puzzle!";
+      }
+    }
+
+    function getRandomPiece() {
+      const remaining = PUZZLE_IMAGES
+        .map((_, i) => i)
+        .filter(i => !userData.pieces.includes(i));
+
+      if (remaining.length === 0) {
+        message.textContent = "You've already completed the puzzle!";
+        return;
+      }
+
+      const randomIndex = remaining[Math.floor(Math.random() * remaining.length)];
+      userData.pieces.push(randomIndex);
+      saveUser();
+      renderPuzzle();
+
+      if (userData.pieces.length === TOTAL_PIECES) {
+        userData.completed = true;
+        saveUser();
+        renderPuzzle();
+        notifyCompletion(userEmail);
+      }
+    }
+
+    function notifyCompletion(email) {
+      message.textContent = "🎉 You completed the puzzle!";
+      fetch(NOTIFY_WEBHOOK + "?email=" + encodeURIComponent(email))
+        .catch(err => console.log("Notification failed", err));
+    }
+
+    startBtn.addEventListener("click", () => {
+      const email = emailInput.value.trim().toLowerCase();
+      if (!email) {
+        alert("Please enter your email.");
+        return;
+      }
+      loadUser(email);
+      document.getElementById("emailSection").style.display = "none";
+      puzzleSection.style.display = "block";
+    });
+
+    getPieceBtn.addEventListener("click", getRandomPiece);
+  </script>
+</body>
+</html>
